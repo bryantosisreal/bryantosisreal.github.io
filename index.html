@@ -33,18 +33,16 @@ input {
 }
 
 canvas {
-    width: 90vw;
-    height: 90vw;
+    width: 92vw;
+    height: 92vw;
 
-    max-width: 600px;
-    max-height: 600px;
-
-    border: 2px solid #444;
-
-    image-rendering: auto;
+    max-width: 650px;
+    max-height: 650px;
 
     display: block;
     margin: 10px auto;
+
+    border: 2px solid #444;
 }
 
 </style>
@@ -54,7 +52,7 @@ canvas {
 
 <h1>keselek durian 67 hari</h1>
 
-<p>loh kok berubah, gambarmu masukin</p>
+<p>loh kok berubah</p>
 
 <input
     type="file"
@@ -73,29 +71,38 @@ canvas {
 // SETTINGS
 // ====================================================
 
-// Actual resolution.
+// Actual pixel resolution.
 //
-// 240 × 240 = 57,600 pixels.
+// 200 × 200 = 40,000 pixels.
 //
-// Much smoother than 120 × 120,
-// while still being reasonable on a phone.
+// This is a good balance between detail and performance.
 
-const WIDTH = 240;
-const HEIGHT = 240;
+const WIDTH = 200;
+const HEIGHT = 200;
 
 
-// Transformation duration
+// Animation time
 
 const ANIMATION_TIME = 12000;
 
 
-// Target images
+// Target files
 
 const TARGETS = [
     "image1.png",
     "image2.png",
     "image3.png"
 ];
+
+
+// Number of color buckets.
+//
+// More buckets = more accurate color matching,
+// but slightly more processing.
+
+const HUE_BUCKETS = 24;
+const SAT_BUCKETS = 6;
+const LIGHT_BUCKETS = 12;
 
 
 // ====================================================
@@ -106,16 +113,19 @@ const canvas =
     document.getElementById("canvas");
 
 const ctx =
-    canvas.getContext("2d");
+    canvas.getContext("2d", {
+        alpha: false
+    });
 
 const input =
     document.getElementById("imageInput");
+
 
 canvas.width = WIDTH;
 canvas.height = HEIGHT;
 
 
-// Remember previous target
+// Previous target
 
 let lastTarget = null;
 
@@ -149,11 +159,11 @@ function rgbToHsl(r, g, b) {
     const min =
         Math.min(r, g, b);
 
+    const lightness =
+        (max + min) / 2;
+
     let h = 0;
     let s = 0;
-
-    const l =
-        (max + min) / 2;
 
 
     if (max !== min) {
@@ -163,38 +173,30 @@ function rgbToHsl(r, g, b) {
 
 
         s =
-            l > 0.5
+            lightness > 0.5
                 ? d / (2 - max - min)
                 : d / (max + min);
 
 
-        switch (max) {
+        if (max === r) {
 
-            case r:
+            h =
+                (g - b) / d +
+                (g < b ? 6 : 0);
 
-                h =
-                    (g - b) / d +
-                    (g < b ? 6 : 0);
+        }
+        else if (max === g) {
 
-                break;
+            h =
+                (b - r) / d +
+                2;
 
+        }
+        else {
 
-            case g:
-
-                h =
-                    (b - r) / d +
-                    2;
-
-                break;
-
-
-            case b:
-
-                h =
-                    (r - g) / d +
-                    4;
-
-                break;
+            h =
+                (r - g) / d +
+                4;
         }
 
 
@@ -205,7 +207,7 @@ function rgbToHsl(r, g, b) {
     return {
         h,
         s,
-        l
+        l: lightness
     };
 }
 
@@ -223,14 +225,12 @@ function loadImage(src) {
                 new Image();
 
 
-            img.onload = () => {
+            img.onload = () =>
                 resolve(img);
-            };
 
 
-            img.onerror = () => {
+            img.onerror = () =>
                 reject();
-            };
 
 
             img.src = src;
@@ -240,20 +240,17 @@ function loadImage(src) {
 
 
 // ====================================================
-// DRAW IMAGE WITH COVER CROP
+// CROP IMAGE
 // ====================================================
 
 function drawCover(
-    ctx,
-    img,
-    width,
-    height
+    img
 ) {
 
     const scale =
         Math.max(
-            width / img.width,
-            height / img.height
+            WIDTH / img.width,
+            HEIGHT / img.height
         );
 
 
@@ -265,10 +262,10 @@ function drawCover(
 
 
     const x =
-        (width - w) / 2;
+        (WIDTH - w) / 2;
 
     const y =
-        (height - h) / 2;
+        (HEIGHT - h) / 2;
 
 
     ctx.drawImage(
@@ -282,7 +279,7 @@ function drawCover(
 
 
 // ====================================================
-// FIND VALID TARGETS
+// VALID TARGETS
 // ====================================================
 
 async function getValidTargets() {
@@ -291,7 +288,8 @@ async function getValidTargets() {
 
 
     for (
-        const filename of TARGETS
+        const filename
+        of TARGETS
     ) {
 
         try {
@@ -303,18 +301,16 @@ async function getValidTargets() {
 
 
             valid.push({
-
                 name: filename,
-
                 image: img
-
             });
 
 
-        } catch {
+        }
+        catch {
 
             console.log(
-                "Ignoring missing image:",
+                "Ignoring:",
                 filename
             );
         }
@@ -326,43 +322,34 @@ async function getValidTargets() {
 
 
 // ====================================================
-// GET RANDOM TARGET
+// RANDOM TARGET
 // ====================================================
 
 async function getRandomTarget() {
 
-    const validTargets =
+    const valid =
         await getValidTargets();
 
 
-    if (
-        validTargets.length === 0
-    ) {
+    if (valid.length === 0) {
 
         return null;
     }
 
 
-    // If there is only one valid image,
-    // we have no alternative.
-
-    if (
-        validTargets.length === 1
-    ) {
+    if (valid.length === 1) {
 
         lastTarget =
-            validTargets[0].name;
+            valid[0].name;
 
-        return validTargets[0];
+        return valid[0];
     }
 
 
-    // Remove previous target
-
     const available =
-        validTargets.filter(
-            target =>
-                target.name !== lastTarget
+        valid.filter(
+            x =>
+                x.name !== lastTarget
         );
 
 
@@ -384,69 +371,377 @@ async function getRandomTarget() {
 
 
 // ====================================================
+// COLOR BUCKET
+// ====================================================
+
+function getBucket(
+    h,
+    s,
+    l
+) {
+
+    let hb =
+        Math.floor(
+            h * HUE_BUCKETS
+        );
+
+    let sb =
+        Math.floor(
+            s * SAT_BUCKETS
+        );
+
+    let lb =
+        Math.floor(
+            l * LIGHT_BUCKETS
+        );
+
+
+    hb =
+        clamp(
+            hb,
+            0,
+            HUE_BUCKETS - 1
+        );
+
+
+    sb =
+        clamp(
+            sb,
+            0,
+            SAT_BUCKETS - 1
+        );
+
+
+    lb =
+        clamp(
+            lb,
+            0,
+            LIGHT_BUCKETS - 1
+        );
+
+
+    return (
+        hb +
+        sb * HUE_BUCKETS +
+        lb *
+        HUE_BUCKETS *
+        SAT_BUCKETS
+    );
+}
+
+
+// ====================================================
 // HUE DISTANCE
 // ====================================================
 
 function hueDistance(a, b) {
 
-    let difference =
+    let d =
         Math.abs(a - b);
 
 
-    // Hue wraps around.
-    //
-    // Red at hue 0 and red at hue 1
-    // should be considered very close.
+    if (d > 0.5) {
 
-    if (difference > 0.5) {
-
-        difference =
-            1 - difference;
+        d =
+            1 - d;
     }
 
 
-    return difference;
+    return d;
 }
 
 
 // ====================================================
-// COLOR MATCH SCORE
+// COLOR DISTANCE
 // ====================================================
 
-function colorDifference(source, target) {
+function colorDistance(
+    a,
+    b
+) {
 
-    const hueDiff =
+    const hue =
         hueDistance(
-            source.h,
-            target.h
+            a.h,
+            b.h
         );
 
 
-    const saturationDiff =
+    const saturation =
         Math.abs(
-            source.s -
-            target.s
+            a.s -
+            b.s
         );
 
 
-    const brightnessDiff =
+    const lightness =
         Math.abs(
-            source.l -
-            target.l
+            a.l -
+            b.l
         );
 
 
-    // Lower score = better match.
+    // Hue matters the most.
     //
-    // Hue is weighted heavily.
-    // Brightness is also important.
-    // Saturation gets a smaller weight.
+    // Saturation and brightness still matter.
 
     return (
-        hueDiff * 0.50 +
-        saturationDiff * 0.20 +
-        brightnessDiff * 0.30
+        hue * 0.55 +
+        saturation * 0.20 +
+        lightness * 0.25
     );
+}
+
+
+// ====================================================
+// CREATE BUCKETS
+// ====================================================
+
+function createBuckets() {
+
+    return new Array(
+        HUE_BUCKETS *
+        SAT_BUCKETS *
+        LIGHT_BUCKETS
+    ).fill(null).map(
+        () => []
+    );
+}
+
+
+// ====================================================
+// FIND BEST PIXEL
+// ====================================================
+
+function findBestPixel(
+    target,
+    buckets,
+    maxRadius
+) {
+
+    const targetHB =
+        Math.floor(
+            target.h *
+            HUE_BUCKETS
+        );
+
+
+    const targetSB =
+        Math.floor(
+            target.s *
+            SAT_BUCKETS
+        );
+
+
+    const targetLB =
+        Math.floor(
+            target.l *
+            LIGHT_BUCKETS
+        );
+
+
+    let best =
+        null;
+
+    let bestDistance =
+        Infinity;
+
+
+    // Search nearby color buckets.
+    //
+    // Start close and expand only when necessary.
+
+    for (
+        let radius = 0;
+        radius <= maxRadius;
+        radius++
+    ) {
+
+        let foundSomething =
+            false;
+
+
+        for (
+            let dh = -radius;
+            dh <= radius;
+            dh++
+        ) {
+
+            let hb =
+                targetHB + dh;
+
+
+            // Hue wraps around.
+
+            hb =
+                (
+                    hb %
+                    HUE_BUCKETS +
+                    HUE_BUCKETS
+                ) %
+                HUE_BUCKETS;
+
+
+            for (
+                let ds = -radius;
+                ds <= radius;
+                ds++
+            ) {
+
+                const sb =
+                    targetSB + ds;
+
+
+                if (
+                    sb < 0 ||
+                    sb >= SAT_BUCKETS
+                ) {
+                    continue;
+                }
+
+
+                for (
+                    let dl = -radius;
+                    dl <= radius;
+                    dl++
+                ) {
+
+                    const lb =
+                        targetLB + dl;
+
+
+                    if (
+                        lb < 0 ||
+                        lb >= LIGHT_BUCKETS
+                    ) {
+                        continue;
+                    }
+
+
+                    const bucketIndex =
+                        hb +
+                        sb *
+                        HUE_BUCKETS +
+                        lb *
+                        HUE_BUCKETS *
+                        SAT_BUCKETS;
+
+
+                    const bucket =
+                        buckets[
+                            bucketIndex
+                        ];
+
+
+                    if (
+                        bucket.length === 0
+                    ) {
+                        continue;
+                    }
+
+
+                    foundSomething =
+                        true;
+
+
+                    // Check pixels inside bucket.
+
+                    for (
+                        let i = 0;
+                        i < bucket.length;
+                        i++
+                    ) {
+
+                        const pixel =
+                            bucket[i];
+
+
+                        const distance =
+                            colorDistance(
+                                pixel,
+                                target
+                            );
+
+
+                        if (
+                            distance <
+                            bestDistance
+                        ) {
+
+                            bestDistance =
+                                distance;
+
+                            best =
+                                pixel;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        // Once we've found candidates
+        // nearby, don't search the entire
+        // color space.
+
+        if (
+            foundSomething &&
+            best !== null
+        ) {
+
+            return best;
+        }
+    }
+
+
+    // Fallback:
+    // find anything that remains.
+
+    for (
+        const bucket
+        of buckets
+    ) {
+
+        if (
+            bucket.length > 0
+        ) {
+
+            return bucket[
+                bucket.length - 1
+            ];
+        }
+    }
+
+
+    return null;
+}
+
+
+// ====================================================
+// REMOVE PIXEL FROM BUCKET
+// ====================================================
+
+function removePixel(
+    pixel
+) {
+
+    const bucket =
+        pixel.bucket;
+
+
+    const index =
+        bucket.indexOf(
+            pixel
+        );
+
+
+    if (index !== -1) {
+
+        bucket.splice(
+            index,
+            1
+        );
+    }
 }
 
 
@@ -487,7 +782,8 @@ input.addEventListener(
                     uploadedURL
                 );
 
-        } catch {
+        }
+        catch {
 
             alert(
                 "Couldn't load that image."
@@ -528,13 +824,13 @@ input.addEventListener(
 
 
         console.log(
-            "Selected target:",
+            "Target:",
             selectedTarget.name
         );
 
 
         // --------------------------------------------
-        // GET SOURCE PIXELS
+        // SOURCE IMAGE DATA
         // --------------------------------------------
 
         ctx.clearRect(
@@ -546,10 +842,7 @@ input.addEventListener(
 
 
         drawCover(
-            ctx,
-            uploaded,
-            WIDTH,
-            HEIGHT
+            uploaded
         );
 
 
@@ -563,7 +856,7 @@ input.addEventListener(
 
 
         // --------------------------------------------
-        // GET TARGET PIXELS
+        // TARGET IMAGE DATA
         // --------------------------------------------
 
         ctx.clearRect(
@@ -575,10 +868,7 @@ input.addEventListener(
 
 
         drawCover(
-            ctx,
-            target,
-            WIDTH,
-            HEIGHT
+            target
         );
 
 
@@ -596,6 +886,10 @@ input.addEventListener(
         // --------------------------------------------
 
         const sourcePixels = [];
+
+
+        const buckets =
+            createBuckets();
 
 
         for (
@@ -626,7 +920,7 @@ input.addEventListener(
                 );
 
 
-            sourcePixels.push({
+            const pixel = {
 
                 r,
                 g,
@@ -653,9 +947,38 @@ input.addEventListener(
                     ),
 
                 targetX: 0,
+                targetY: 0,
 
-                targetY: 0
-            });
+                bucket: null
+            };
+
+
+            const bucketIndex =
+                getBucket(
+                    pixel.h,
+                    pixel.s,
+                    pixel.l
+                );
+
+
+            const bucket =
+                buckets[
+                    bucketIndex
+                ];
+
+
+            pixel.bucket =
+                bucket;
+
+
+            bucket.push(
+                pixel
+            );
+
+
+            sourcePixels.push(
+                pixel
+            );
         }
 
 
@@ -716,80 +1039,54 @@ input.addEventListener(
 
 
         // ====================================================
-        // SORT BY HUE + SATURATION + BRIGHTNESS
+        // MATCH EVERY TARGET LOCATION
         // ====================================================
 
-        // Instead of ONLY brightness,
-        // we calculate a combined color value.
-        //
-        // This makes similar colors tend to end up
-        // near similar areas of the target.
-
-        sourcePixels.sort(
-            (a, b) => {
-
-                const aValue =
-                    a.h * 0.50 +
-                    a.s * 0.20 +
-                    a.l * 0.30;
-
-
-                const bValue =
-                    b.h * 0.50 +
-                    b.s * 0.20 +
-                    b.l * 0.30;
-
-
-                return aValue - bValue;
-            }
+        console.log(
+            "Matching pixels..."
         );
 
-
-        targetPixels.sort(
-            (a, b) => {
-
-                const aValue =
-                    a.h * 0.50 +
-                    a.s * 0.20 +
-                    a.l * 0.30;
-
-
-                const bValue =
-                    b.h * 0.50 +
-                    b.s * 0.20 +
-                    b.l * 0.30;
-
-
-                return aValue - bValue;
-            }
-        );
-
-
-        // ====================================================
-        // ASSIGN TARGET POSITIONS
-        // ====================================================
-
-        // Every target position is used exactly once.
 
         for (
-            let i = 0;
-            i < sourcePixels.length;
-            i++
+            const targetPixel
+            of targetPixels
         ) {
 
-            const source =
-                sourcePixels[i];
+            const sourcePixel =
+                findBestPixel(
+                    targetPixel,
+                    buckets,
+                    3
+                );
 
-            const targetPixel =
-                targetPixels[i];
+
+            if (!sourcePixel) {
+                continue;
+            }
 
 
-            source.targetX =
+            // Give this source pixel
+            // the target's position.
+
+            sourcePixel.targetX =
                 targetPixel.x;
 
-            source.targetY =
+            sourcePixel.targetY =
                 targetPixel.y;
+
+
+            // Remove it so another target
+            // position cannot use the same pixel.
+
+            removePixel(
+                sourcePixel
+            );
         }
+
+
+        console.log(
+            "Pixel matching complete."
+        );
 
 
         // ====================================================
@@ -810,13 +1107,12 @@ input.addEventListener(
                 clamp(
                     elapsed /
                     ANIMATION_TIME,
-
                     0,
                     1
                 );
 
 
-            // Smooth ease-out
+            // Smooth movement
 
             const eased =
                 1 -
@@ -861,9 +1157,9 @@ input.addEventListener(
                     eased;
 
 
-                // ORIGINAL COLOR
+                // ORIGINAL COLOR.
                 //
-                // No hue/saturation modification.
+                // We NEVER change r/g/b.
 
                 ctx.fillStyle =
                     `rgb(
@@ -874,15 +1170,12 @@ input.addEventListener(
 
 
                 ctx.fillRect(
-
                     Math.round(
                         pixel.x
                     ),
-
                     Math.round(
                         pixel.y
                     ),
-
                     1,
                     1
                 );
@@ -901,8 +1194,8 @@ input.addEventListener(
                     animate
                 );
 
-
-            } else {
+            }
+            else {
 
                 // Final frame
 
@@ -928,11 +1221,8 @@ input.addEventListener(
 
 
                     ctx.fillRect(
-
                         pixel.targetX,
-
                         pixel.targetY,
-
                         1,
                         1
                     );
