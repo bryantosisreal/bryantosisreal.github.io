@@ -1,10 +1,400 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>tes</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Pixel Mimic</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        background: #111;
+        color: white;
+        font-family: Arial, sans-serif;
+        text-align: center;
+    }
+
+    h1 {
+        margin: 20px 0 8px;
+    }
+
+    p {
+        color: #aaa;
+    }
+
+    input {
+        margin: 15px;
+    }
+
+    canvas {
+        max-width: 95vw;
+        max-height: 75vh;
+        image-rendering: pixelated;
+        border: 1px solid #444;
+    }
+</style>
 </head>
+
 <body>
-    <h1>working</h1>
-    <p>bakso pak bryantos</p>
+
+<h1>Pixel Mimic</h1>
+
+<p>Upload an image and watch its pixels rearrange.</p>
+
+<input type="file" id="imageInput" accept="image/*">
+
+<br>
+
+<canvas id="canvas"></canvas>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const input = document.getElementById("imageInput");
+
+const TARGET = "IMG_20260824_110146_071.jpg";
+
+// How long the animation takes
+const ANIMATION_TIME = 12000;
+
+// ----------------------------------------------------
+// Utility
+// ----------------------------------------------------
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+
+// Convert RGB → HSL
+function rgbToHsl(r, g, b) {
+
+    r /= 255;
+    g /= 255;
+    b /= 255;
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+
+    let h = 0;
+    let s = 0;
+
+    const l = (max + min) / 2;
+
+    if (max !== min) {
+
+        const d = max - min;
+
+        s = l > 0.5
+            ? d / (2 - max - min)
+            : d / (max + min);
+
+        switch (max) {
+
+            case r:
+                h = (g - b) / d + (g < b ? 6 : 0);
+                break;
+
+            case g:
+                h = (b - r) / d + 2;
+                break;
+
+            case b:
+                h = (r - g) / d + 4;
+                break;
+        }
+
+        h /= 6;
+    }
+
+    return {
+        h: h,
+        s: s,
+        l: l
+    };
+}
+
+
+// ----------------------------------------------------
+// Load image
+// ----------------------------------------------------
+
+function loadImage(src) {
+
+    return new Promise((resolve, reject) => {
+
+        const img = new Image();
+
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+
+        img.src = src;
+    });
+}
+
+
+// ----------------------------------------------------
+// Crop image to fit canvas
+// ----------------------------------------------------
+
+function drawCover(ctx, img, width, height) {
+
+    const scale = Math.max(
+        width / img.width,
+        height / img.height
+    );
+
+    const w = img.width * scale;
+    const h = img.height * scale;
+
+    const x = (width - w) / 2;
+    const y = (height - h) / 2;
+
+    ctx.drawImage(img, x, y, w, h);
+}
+
+
+// ----------------------------------------------------
+// Main
+// ----------------------------------------------------
+
+input.addEventListener("change", async () => {
+
+    const file = input.files[0];
+
+    if (!file) return;
+
+    const uploadedURL = URL.createObjectURL(file);
+
+    const uploaded = await loadImage(uploadedURL);
+    const target = await loadImage(TARGET);
+
+
+    // Smaller = faster.
+    // Increase this if you want more pixels.
+    const width = 160;
+    const height = 160;
+
+    canvas.width = width;
+    canvas.height = height;
+
+
+    // -----------------------------------------------
+    // Get uploaded image pixels
+    // -----------------------------------------------
+
+    ctx.clearRect(0, 0, width, height);
+
+    drawCover(ctx, uploaded, width, height);
+
+    const sourceData =
+        ctx.getImageData(0, 0, width, height).data;
+
+
+    // -----------------------------------------------
+    // Get target image pixels
+    // -----------------------------------------------
+
+    ctx.clearRect(0, 0, width, height);
+
+    drawCover(ctx, target, width, height);
+
+    const targetData =
+        ctx.getImageData(0, 0, width, height).data;
+
+
+    // -----------------------------------------------
+    // Create source pixels
+    // -----------------------------------------------
+
+    const sourcePixels = [];
+    const targetPixels = [];
+
+
+    for (let i = 0; i < width * height; i++) {
+
+        const index = i * 4;
+
+        const r = sourceData[index];
+        const g = sourceData[index + 1];
+        const b = sourceData[index + 2];
+
+        const color = {
+            r,
+            g,
+            b
+        };
+
+        const hsl = rgbToHsl(r, g, b);
+
+        sourcePixels.push({
+            r,
+            g,
+            b,
+
+            h: hsl.h,
+            s: hsl.s,
+            l: hsl.l,
+
+            // Starting position
+            x: i % width,
+            y: Math.floor(i / width),
+
+            startX: i % width,
+            startY: Math.floor(i / width),
+
+            targetX: 0,
+            targetY: 0
+        });
+    }
+
+
+    // -----------------------------------------------
+    // Target pixels
+    // -----------------------------------------------
+
+    for (let i = 0; i < width * height; i++) {
+
+        const index = i * 4;
+
+        const r = targetData[index];
+        const g = targetData[index + 1];
+        const b = targetData[index + 2];
+
+        const hsl = rgbToHsl(r, g, b);
+
+        targetPixels.push({
+            r,
+            g,
+            b,
+
+            h: hsl.h,
+            s: hsl.s,
+            l: hsl.l,
+
+            x: i % width,
+            y: Math.floor(i / width),
+
+            used: false
+        });
+    }
+
+
+    // -----------------------------------------------
+    // Match pixels
+    // -----------------------------------------------
+
+    // We sort both lists by brightness first.
+    //
+    // This makes dark source pixels generally move
+    // toward dark target areas, and bright pixels
+    // toward bright target areas.
+    //
+    // Their colors are NEVER changed.
+
+    sourcePixels.sort((a, b) => a.l - b.l);
+
+    targetPixels.sort((a, b) => a.l - b.l);
+
+
+    for (let i = 0; i < sourcePixels.length; i++) {
+
+        const source = sourcePixels[i];
+        const target = targetPixels[i];
+
+        source.targetX = target.x;
+        source.targetY = target.y;
+    }
+
+
+    // -----------------------------------------------
+    // Animation
+    // -----------------------------------------------
+
+    const startTime = performance.now();
+
+
+    function animate(now) {
+
+        const elapsed = now - startTime;
+
+        let progress =
+            clamp(elapsed / ANIMATION_TIME, 0, 1);
+
+
+        // Smooth movement
+        const eased =
+            1 - Math.pow(1 - progress, 3);
+
+
+        ctx.clearRect(0, 0, width, height);
+
+
+        for (const pixel of sourcePixels) {
+
+            pixel.x =
+                pixel.startX +
+                (pixel.targetX - pixel.startX) * eased;
+
+            pixel.y =
+                pixel.startY +
+                (pixel.targetY - pixel.startY) * eased;
+
+
+            // IMPORTANT:
+            // The original RGB values are used.
+            // Nothing changes the pixel's color.
+
+            ctx.fillStyle =
+                `rgb(${pixel.r}, ${pixel.g}, ${pixel.b})`;
+
+
+            ctx.fillRect(
+                Math.round(pixel.x),
+                Math.round(pixel.y),
+                1,
+                1
+            );
+        }
+
+
+        if (progress < 1) {
+
+            requestAnimationFrame(animate);
+
+        } else {
+
+            // Final frame
+            ctx.clearRect(0, 0, width, height);
+
+            for (const pixel of sourcePixels) {
+
+                ctx.fillStyle =
+                    `rgb(${pixel.r}, ${pixel.g}, ${pixel.b})`;
+
+                ctx.fillRect(
+                    pixel.targetX,
+                    pixel.targetY,
+                    1,
+                    1
+                );
+            }
+        }
+    }
+
+
+    requestAnimationFrame(animate);
+
+});
+
+</script>
+
 </body>
 </html>
