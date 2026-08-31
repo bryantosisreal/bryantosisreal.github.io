@@ -4,47 +4,47 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>loh kok berubah</title>
+<title>jasa khas bryantos</title>
 
 <style>
-    * {
-        box-sizing: border-box;
-    }
+* {
+    box-sizing: border-box;
+}
 
-    body {
-        margin: 0;
-        background: #111;
-        color: white;
-        font-family: Arial, sans-serif;
-        text-align: center;
-    }
+body {
+    margin: 0;
+    background: #111;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+}
 
-    h1 {
-        margin: 20px 0 8px;
-    }
+h1 {
+    margin: 20px 0 8px;
+}
 
-    p {
-        color: #aaa;
-    }
+p {
+    color: #aaa;
+}
 
-    input {
-        margin: 15px;
-    }
+input {
+    margin: 15px;
+}
 
-    canvas {
-        max-width: 95vw;
-        max-height: 75vh;
-        image-rendering: pixelated;
-        border: 1px solid #444;
-    }
+canvas {
+    max-width: 95vw;
+    max-height: 75vh;
+    border: 1px solid #444;
+    image-rendering: pixelated;
+}
 </style>
 </head>
 
 <body>
 
-<h1>loh kok berubah</h1>
+<h1>keselek durian 67 hari</h1>
 
-<p>Upload image aja terus liat (bisa agak ngelag)</p>
+<p>loh kok berubah ya</p>
 
 <input type="file" id="imageInput" accept="image/*">
 
@@ -59,21 +59,37 @@ const ctx = canvas.getContext("2d");
 
 const input = document.getElementById("imageInput");
 
-const TARGET = "IMG_20260824_110146_071.jpg";
 
-// How long the animation takes
+// ====================================================
+// TARGET IMAGES
+// ====================================================
+
+const TARGETS = [
+    "image1.png",
+    "image2.png",
+    "image3.png"
+];
+
+
+// How long the transformation takes
 const ANIMATION_TIME = 12000;
 
-// ----------------------------------------------------
+
+// Resolution
+const WIDTH = 160;
+const HEIGHT = 160;
+
+
+// ====================================================
 // Utility
-// ----------------------------------------------------
+// ====================================================
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
 
-// Convert RGB → HSL
+// RGB → HSL
 function rgbToHsl(r, g, b) {
 
     r /= 255;
@@ -115,16 +131,16 @@ function rgbToHsl(r, g, b) {
     }
 
     return {
-        h: h,
-        s: s,
-        l: l
+        h,
+        s,
+        l
     };
 }
 
 
-// ----------------------------------------------------
+// ====================================================
 // Load image
-// ----------------------------------------------------
+// ====================================================
 
 function loadImage(src) {
 
@@ -133,16 +149,17 @@ function loadImage(src) {
         const img = new Image();
 
         img.onload = () => resolve(img);
-        img.onerror = reject;
+
+        img.onerror = () => reject();
 
         img.src = src;
     });
 }
 
 
-// ----------------------------------------------------
-// Crop image to fit canvas
-// ----------------------------------------------------
+// ====================================================
+// Crop image to fill canvas
+// ====================================================
 
 function drawCover(ctx, img, width, height) {
 
@@ -157,13 +174,51 @@ function drawCover(ctx, img, width, height) {
     const x = (width - w) / 2;
     const y = (height - h) / 2;
 
-    ctx.drawImage(img, x, y, w, h);
+    ctx.drawImage(
+        img,
+        x,
+        y,
+        w,
+        h
+    );
 }
 
 
-// ----------------------------------------------------
+// ====================================================
+// Find valid target images
+// ====================================================
+
+async function getValidTargets() {
+
+    const valid = [];
+
+    for (const filename of TARGETS) {
+
+        try {
+
+            const img = await loadImage(filename);
+
+            valid.push({
+                name: filename,
+                image: img
+            });
+
+        } catch {
+
+            console.log(
+                "Ignoring missing image:",
+                filename
+            );
+        }
+    }
+
+    return valid;
+}
+
+
+// ====================================================
 // Main
-// ----------------------------------------------------
+// ====================================================
 
 input.addEventListener("change", async () => {
 
@@ -171,54 +226,136 @@ input.addEventListener("change", async () => {
 
     if (!file) return;
 
-    const uploadedURL = URL.createObjectURL(file);
 
-    const uploaded = await loadImage(uploadedURL);
-    const target = await loadImage(TARGET);
+    // ------------------------------------------------
+    // Load uploaded image
+    // ------------------------------------------------
 
+    const uploadedURL =
+        URL.createObjectURL(file);
 
-    // Smaller = faster.
-    // Increase this if you want more pixels.
-    const width = 160;
-    const height = 160;
-
-    canvas.width = width;
-    canvas.height = height;
+    const uploaded =
+        await loadImage(uploadedURL);
 
 
-    // -----------------------------------------------
-    // Get uploaded image pixels
-    // -----------------------------------------------
+    // ------------------------------------------------
+    // Find available target images
+    // ------------------------------------------------
 
-    ctx.clearRect(0, 0, width, height);
+    const validTargets =
+        await getValidTargets();
 
-    drawCover(ctx, uploaded, width, height);
+
+    // If absolutely none exist
+    if (validTargets.length === 0) {
+
+        alert(
+            "No target images found! Add image1.png, image2.png, or image3.png."
+        );
+
+        return;
+    }
+
+
+    // ------------------------------------------------
+    // Pick RANDOM target
+    // ------------------------------------------------
+
+    const selectedTarget =
+        validTargets[
+            Math.floor(
+                Math.random() *
+                validTargets.length
+            )
+        ];
+
+
+    console.log(
+        "Selected target:",
+        selectedTarget.name
+    );
+
+
+    const target =
+        selectedTarget.image;
+
+
+    // ------------------------------------------------
+    // Canvas
+    // ------------------------------------------------
+
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+
+
+    // ------------------------------------------------
+    // Get source image pixels
+    // ------------------------------------------------
+
+    ctx.clearRect(
+        0,
+        0,
+        WIDTH,
+        HEIGHT
+    );
+
+    drawCover(
+        ctx,
+        uploaded,
+        WIDTH,
+        HEIGHT
+    );
 
     const sourceData =
-        ctx.getImageData(0, 0, width, height).data;
+        ctx.getImageData(
+            0,
+            0,
+            WIDTH,
+            HEIGHT
+        ).data;
 
 
-    // -----------------------------------------------
-    // Get target image pixels
-    // -----------------------------------------------
+    // ------------------------------------------------
+    // Get target pixels
+    // ------------------------------------------------
 
-    ctx.clearRect(0, 0, width, height);
+    ctx.clearRect(
+        0,
+        0,
+        WIDTH,
+        HEIGHT
+    );
 
-    drawCover(ctx, target, width, height);
+    drawCover(
+        ctx,
+        target,
+        WIDTH,
+        HEIGHT
+    );
 
     const targetData =
-        ctx.getImageData(0, 0, width, height).data;
+        ctx.getImageData(
+            0,
+            0,
+            WIDTH,
+            HEIGHT
+        ).data;
 
 
-    // -----------------------------------------------
+    // ------------------------------------------------
     // Create source pixels
-    // -----------------------------------------------
+    // ------------------------------------------------
 
     const sourcePixels = [];
+
     const targetPixels = [];
 
 
-    for (let i = 0; i < width * height; i++) {
+    for (
+        let i = 0;
+        i < WIDTH * HEIGHT;
+        i++
+    ) {
 
         const index = i * 4;
 
@@ -226,15 +363,12 @@ input.addEventListener("change", async () => {
         const g = sourceData[index + 1];
         const b = sourceData[index + 2];
 
-        const color = {
-            r,
-            g,
-            b
-        };
+        const hsl =
+            rgbToHsl(r, g, b);
 
-        const hsl = rgbToHsl(r, g, b);
 
         sourcePixels.push({
+
             r,
             g,
             b,
@@ -243,12 +377,11 @@ input.addEventListener("change", async () => {
             s: hsl.s,
             l: hsl.l,
 
-            // Starting position
-            x: i % width,
-            y: Math.floor(i / width),
+            startX: i % WIDTH,
+            startY: Math.floor(i / WIDTH),
 
-            startX: i % width,
-            startY: Math.floor(i / width),
+            x: i % WIDTH,
+            y: Math.floor(i / WIDTH),
 
             targetX: 0,
             targetY: 0
@@ -256,11 +389,15 @@ input.addEventListener("change", async () => {
     }
 
 
-    // -----------------------------------------------
-    // Target pixels
-    // -----------------------------------------------
+    // ------------------------------------------------
+    // Create target pixels
+    // ------------------------------------------------
 
-    for (let i = 0; i < width * height; i++) {
+    for (
+        let i = 0;
+        i < WIDTH * HEIGHT;
+        i++
+    ) {
 
         const index = i * 4;
 
@@ -268,9 +405,12 @@ input.addEventListener("change", async () => {
         const g = targetData[index + 1];
         const b = targetData[index + 2];
 
-        const hsl = rgbToHsl(r, g, b);
+        const hsl =
+            rgbToHsl(r, g, b);
+
 
         targetPixels.push({
+
             r,
             g,
             b,
@@ -279,81 +419,124 @@ input.addEventListener("change", async () => {
             s: hsl.s,
             l: hsl.l,
 
-            x: i % width,
-            y: Math.floor(i / width),
-
-            used: false
+            x: i % WIDTH,
+            y: Math.floor(i / WIDTH)
         });
     }
 
 
-    // -----------------------------------------------
-    // Match pixels
-    // -----------------------------------------------
+    // =================================================
+    // PIXEL MATCHING
+    // =================================================
 
-    // We sort both lists by brightness first.
-    //
-    // This makes dark source pixels generally move
-    // toward dark target areas, and bright pixels
-    // toward bright target areas.
-    //
-    // Their colors are NEVER changed.
-
-    sourcePixels.sort((a, b) => a.l - b.l);
-
-    targetPixels.sort((a, b) => a.l - b.l);
+    // Sort source pixels by brightness
+    sourcePixels.sort(
+        (a, b) => a.l - b.l
+    );
 
 
-    for (let i = 0; i < sourcePixels.length; i++) {
+    // Sort target positions by brightness
+    targetPixels.sort(
+        (a, b) => a.l - b.l
+    );
 
-        const source = sourcePixels[i];
-        const target = targetPixels[i];
 
-        source.targetX = target.x;
-        source.targetY = target.y;
+    // Match them
+    for (
+        let i = 0;
+        i < sourcePixels.length;
+        i++
+    ) {
+
+        const source =
+            sourcePixels[i];
+
+        const target =
+            targetPixels[i];
+
+
+        source.targetX =
+            target.x;
+
+        source.targetY =
+            target.y;
     }
 
 
-    // -----------------------------------------------
-    // Animation
-    // -----------------------------------------------
+    // =================================================
+    // ANIMATION
+    // =================================================
 
-    const startTime = performance.now();
+    const startTime =
+        performance.now();
 
 
     function animate(now) {
 
-        const elapsed = now - startTime;
+        const elapsed =
+            now - startTime;
+
 
         let progress =
-            clamp(elapsed / ANIMATION_TIME, 0, 1);
+            clamp(
+                elapsed /
+                ANIMATION_TIME,
+                0,
+                1
+            );
 
 
-        // Smooth movement
+        // Smooth ease-out
         const eased =
-            1 - Math.pow(1 - progress, 3);
+            1 -
+            Math.pow(
+                1 - progress,
+                3
+            );
 
 
-        ctx.clearRect(0, 0, width, height);
+        ctx.clearRect(
+            0,
+            0,
+            WIDTH,
+            HEIGHT
+        );
 
+
+        // ------------------------------------------------
+        // Draw every pixel
+        // ------------------------------------------------
 
         for (const pixel of sourcePixels) {
 
             pixel.x =
                 pixel.startX +
-                (pixel.targetX - pixel.startX) * eased;
+                (
+                    pixel.targetX -
+                    pixel.startX
+                ) *
+                eased;
+
 
             pixel.y =
                 pixel.startY +
-                (pixel.targetY - pixel.startY) * eased;
+                (
+                    pixel.targetY -
+                    pixel.startY
+                ) *
+                eased;
 
 
             // IMPORTANT:
-            // The original RGB values are used.
-            // Nothing changes the pixel's color.
+            // Original RGB is preserved.
+            // We NEVER modify the pixel color.
 
             ctx.fillStyle =
-                `rgb(${pixel.r}, ${pixel.g}, ${pixel.b})`;
+                `rgb(
+                    ${pixel.r},
+                    ${pixel.g},
+                    ${pixel.b}
+                )`;
 
 
             ctx.fillRect(
@@ -365,19 +548,37 @@ input.addEventListener("change", async () => {
         }
 
 
+        // ------------------------------------------------
+        // Continue animation
+        // ------------------------------------------------
+
         if (progress < 1) {
 
-            requestAnimationFrame(animate);
+            requestAnimationFrame(
+                animate
+            );
 
         } else {
 
             // Final frame
-            ctx.clearRect(0, 0, width, height);
+
+            ctx.clearRect(
+                0,
+                0,
+                WIDTH,
+                HEIGHT
+            );
+
 
             for (const pixel of sourcePixels) {
 
                 ctx.fillStyle =
-                    `rgb(${pixel.r}, ${pixel.g}, ${pixel.b})`;
+                    `rgb(
+                        ${pixel.r},
+                        ${pixel.g},
+                        ${pixel.b}
+                    )`;
+
 
                 ctx.fillRect(
                     pixel.targetX,
@@ -390,7 +591,9 @@ input.addEventListener("change", async () => {
     }
 
 
-    requestAnimationFrame(animate);
+    requestAnimationFrame(
+        animate
+    );
 
 });
 
