@@ -35,12 +35,13 @@ input {
 canvas {
     width: 90vw;
     height: 90vw;
+
     max-width: 600px;
     max-height: 600px;
 
     border: 2px solid #444;
 
-    image-rendering: pixelated;
+    image-rendering: auto;
 
     display: block;
     margin: 10px auto;
@@ -53,7 +54,7 @@ canvas {
 
 <h1>keselek durian 67 hari</h1>
 
-<p>loh kok berubah, masukin gambar aja</p>
+<p>loh kok berubah, gambarmu masukin</p>
 
 <input
     type="file"
@@ -72,21 +73,23 @@ canvas {
 // SETTINGS
 // ====================================================
 
-// Actual pixel resolution.
-// Lower = less lag.
-// The canvas is scaled up visually.
+// Actual resolution.
+//
+// 240 × 240 = 57,600 pixels.
+//
+// Much smoother than 120 × 120,
+// while still being reasonable on a phone.
 
-const WIDTH = 120;
-const HEIGHT = 120;
+const WIDTH = 240;
+const HEIGHT = 240;
 
 
-// Animation duration in milliseconds.
-// 12000 = 12 seconds.
+// Transformation duration
 
 const ANIMATION_TIME = 12000;
 
 
-// Target images in your repository.
+// Target images
 
 const TARGETS = [
     "image1.png",
@@ -108,20 +111,17 @@ const ctx =
 const input =
     document.getElementById("imageInput");
 
-
-// Actual canvas resolution
-
 canvas.width = WIDTH;
 canvas.height = HEIGHT;
 
 
-// Remember the previous target
+// Remember previous target
 
 let lastTarget = null;
 
 
 // ====================================================
-// UTILITY
+// CLAMP
 // ====================================================
 
 function clamp(value, min, max) {
@@ -224,16 +224,12 @@ function loadImage(src) {
 
 
             img.onload = () => {
-
                 resolve(img);
-
             };
 
 
             img.onerror = () => {
-
                 reject();
-
             };
 
 
@@ -244,7 +240,7 @@ function loadImage(src) {
 
 
 // ====================================================
-// DRAW IMAGE WITH CROPPING
+// DRAW IMAGE WITH COVER CROP
 // ====================================================
 
 function drawCover(
@@ -286,7 +282,7 @@ function drawCover(
 
 
 // ====================================================
-// FIND VALID TARGET IMAGES
+// FIND VALID TARGETS
 // ====================================================
 
 async function getValidTargets() {
@@ -339,8 +335,6 @@ async function getRandomTarget() {
         await getValidTargets();
 
 
-    // No target images
-
     if (
         validTargets.length === 0
     ) {
@@ -349,8 +343,8 @@ async function getRandomTarget() {
     }
 
 
-    // Only one valid target.
-    // We have no choice.
+    // If there is only one valid image,
+    // we have no alternative.
 
     if (
         validTargets.length === 1
@@ -363,7 +357,7 @@ async function getRandomTarget() {
     }
 
 
-    // Remove the previous target
+    // Remove previous target
 
     const available =
         validTargets.filter(
@@ -371,8 +365,6 @@ async function getRandomTarget() {
                 target.name !== lastTarget
         );
 
-
-    // Pick random target
 
     const selected =
         available[
@@ -383,8 +375,6 @@ async function getRandomTarget() {
         ];
 
 
-    // Remember it
-
     lastTarget =
         selected.name;
 
@@ -394,33 +384,68 @@ async function getRandomTarget() {
 
 
 // ====================================================
-// DRAW ONE PIXEL
+// HUE DISTANCE
 // ====================================================
 
-function drawPixel(pixel) {
+function hueDistance(a, b) {
 
-    // IMPORTANT:
+    let difference =
+        Math.abs(a - b);
+
+
+    // Hue wraps around.
     //
-    // The original RGB values are used.
-    // We NEVER modify the color.
+    // Red at hue 0 and red at hue 1
+    // should be considered very close.
 
-    ctx.fillStyle =
-        `rgb(
-            ${pixel.r},
-            ${pixel.g},
-            ${pixel.b}
-        )`;
+    if (difference > 0.5) {
+
+        difference =
+            1 - difference;
+    }
 
 
-    ctx.fillRect(
+    return difference;
+}
 
-        Math.round(pixel.x),
 
-        Math.round(pixel.y),
+// ====================================================
+// COLOR MATCH SCORE
+// ====================================================
 
-        1,
+function colorDifference(source, target) {
 
-        1
+    const hueDiff =
+        hueDistance(
+            source.h,
+            target.h
+        );
+
+
+    const saturationDiff =
+        Math.abs(
+            source.s -
+            target.s
+        );
+
+
+    const brightnessDiff =
+        Math.abs(
+            source.l -
+            target.l
+        );
+
+
+    // Lower score = better match.
+    //
+    // Hue is weighted heavily.
+    // Brightness is also important.
+    // Saturation gets a smaller weight.
+
+    return (
+        hueDiff * 0.50 +
+        saturationDiff * 0.20 +
+        brightnessDiff * 0.30
     );
 }
 
@@ -443,7 +468,7 @@ input.addEventListener(
 
 
         // --------------------------------------------
-        // Load uploaded image
+        // LOAD UPLOADED IMAGE
         // --------------------------------------------
 
         const uploadedURL =
@@ -452,14 +477,32 @@ input.addEventListener(
             );
 
 
-        const uploaded =
-            await loadImage(
+        let uploaded;
+
+
+        try {
+
+            uploaded =
+                await loadImage(
+                    uploadedURL
+                );
+
+        } catch {
+
+            alert(
+                "Couldn't load that image."
+            );
+
+            URL.revokeObjectURL(
                 uploadedURL
             );
 
+            return;
+        }
+
 
         // --------------------------------------------
-        // Pick target
+        // CHOOSE TARGET
         // --------------------------------------------
 
         const selectedTarget =
@@ -491,7 +534,7 @@ input.addEventListener(
 
 
         // --------------------------------------------
-        // SOURCE IMAGE
+        // GET SOURCE PIXELS
         // --------------------------------------------
 
         ctx.clearRect(
@@ -520,7 +563,7 @@ input.addEventListener(
 
 
         // --------------------------------------------
-        // TARGET IMAGE
+        // GET TARGET PIXELS
         // --------------------------------------------
 
         ctx.clearRect(
@@ -549,7 +592,7 @@ input.addEventListener(
 
 
         // --------------------------------------------
-        // CREATE SOURCE PIXELS
+        // SOURCE PIXELS
         // --------------------------------------------
 
         const sourcePixels = [];
@@ -617,7 +660,7 @@ input.addEventListener(
 
 
         // --------------------------------------------
-        // CREATE TARGET POSITIONS
+        // TARGET PIXELS
         // --------------------------------------------
 
         const targetPixels = [];
@@ -673,26 +716,60 @@ input.addEventListener(
 
 
         // ====================================================
-        // MATCH PIXELS BY BRIGHTNESS
+        // SORT BY HUE + SATURATION + BRIGHTNESS
         // ====================================================
 
-        // Dark source pixels go toward
-        // dark target positions.
+        // Instead of ONLY brightness,
+        // we calculate a combined color value.
+        //
+        // This makes similar colors tend to end up
+        // near similar areas of the target.
 
         sourcePixels.sort(
-            (a, b) =>
-                a.l - b.l
+            (a, b) => {
+
+                const aValue =
+                    a.h * 0.50 +
+                    a.s * 0.20 +
+                    a.l * 0.30;
+
+
+                const bValue =
+                    b.h * 0.50 +
+                    b.s * 0.20 +
+                    b.l * 0.30;
+
+
+                return aValue - bValue;
+            }
         );
 
 
         targetPixels.sort(
-            (a, b) =>
-                a.l - b.l
+            (a, b) => {
+
+                const aValue =
+                    a.h * 0.50 +
+                    a.s * 0.20 +
+                    a.l * 0.30;
+
+
+                const bValue =
+                    b.h * 0.50 +
+                    b.s * 0.20 +
+                    b.l * 0.30;
+
+
+                return aValue - bValue;
+            }
         );
 
 
-        // Each target position is assigned
-        // to exactly one source pixel.
+        // ====================================================
+        // ASSIGN TARGET POSITIONS
+        // ====================================================
+
+        // Every target position is used exactly once.
 
         for (
             let i = 0;
@@ -784,14 +861,36 @@ input.addEventListener(
                     eased;
 
 
-                drawPixel(
-                    pixel
+                // ORIGINAL COLOR
+                //
+                // No hue/saturation modification.
+
+                ctx.fillStyle =
+                    `rgb(
+                        ${pixel.r},
+                        ${pixel.g},
+                        ${pixel.b}
+                    )`;
+
+
+                ctx.fillRect(
+
+                    Math.round(
+                        pixel.x
+                    ),
+
+                    Math.round(
+                        pixel.y
+                    ),
+
+                    1,
+                    1
                 );
             }
 
 
             // --------------------------------------------
-            // CONTINUE ANIMATION
+            // CONTINUE
             // --------------------------------------------
 
             if (
@@ -802,11 +901,10 @@ input.addEventListener(
                     animate
                 );
 
+
             } else {
 
-                // ----------------------------------------
-                // FINAL FRAME
-                // ----------------------------------------
+                // Final frame
 
                 ctx.clearRect(
                     0,
@@ -821,15 +919,22 @@ input.addEventListener(
                     of sourcePixels
                 ) {
 
-                    pixel.x =
-                        pixel.targetX;
+                    ctx.fillStyle =
+                        `rgb(
+                            ${pixel.r},
+                            ${pixel.g},
+                            ${pixel.b}
+                        )`;
 
-                    pixel.y =
-                        pixel.targetY;
 
+                    ctx.fillRect(
 
-                    drawPixel(
-                        pixel
+                        pixel.targetX,
+
+                        pixel.targetY,
+
+                        1,
+                        1
                     );
                 }
             }
@@ -840,8 +945,6 @@ input.addEventListener(
             animate
         );
 
-
-        // Clean up uploaded image URL
 
         URL.revokeObjectURL(
             uploadedURL
